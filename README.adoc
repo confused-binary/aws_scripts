@@ -1,3 +1,5 @@
+Older scripts used for testing that were created based on need and kept around for use here and there. Some may not work well anymore. :) Happy hunting, but only use this stuff when given approval to do so!
+
 == Supporting Scripts
 
 More matured scripts used to assist with gathering artifacts for AWS Penetration Test reporting.
