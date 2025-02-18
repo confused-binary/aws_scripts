@@ -1,0 +1,149 @@
+== Supporting Scripts
+
+More matured scripts used to assist with gathering artifacts for AWS Penetration Test reporting.
+
+=== aws-all
+
+A wrapper script that is intended to help running aws commands against all accounts that have an individual profile in ~/.aws/credentials
+
+In order to use, the `$ENG` variable will need to be set. The script expects this to be a regex value that will match the names of the profiles in ~/.aws/credentials that you want to run commands against. 
+
+The bash script should be saved somewhere in $PATH so that it can easily be similar to regular `aws` commands. 
+
+The script include two internal variables that can be passed as part of commands run and will be populated with each internal  loop.
+
+- `prof`: The name of the AWS profile (as matched by the regex in ~/.aws/credentials) that the loop is currently acting under
+- `acct_id`: The AWS account ID for the profile that the loop is currently acting under
+
+**Example**
+
+[cols="1,3"]
+|===
+|AWS cli | `aws sts get-caller-identity`
+|aws-all | `aws-all sts get-caller-identity`
+|===
+
+=== aws_recon.sh
+
+A script to complete initial recon against an AWS account based on the profile regex value stored in the `$ENG` system variable. Required `$ENG_HOME` to be set as well in order to know where to leave results. Runs the following checks against the account.
+
+* **ScoutSuite**: Outputs in ${ENG_HOME}/scout_${profile}/
+* **pmapper**: Outputs in ${ENG_HOME}/pmapper_${profile}
+* **Initial Dumps** Outputs in ${ENG_HOME}/dump_dir
+** ec2 describe-instances
+** ec2 describe-security-groups
+** ec2 describe-subnets
+** lambda list-functions
+** ecs list-clusters
+** ecr describe-repositories
+** iam list-users
+** iam list-roles
+** iam list-policies (Local Only)
+** iam list-groups
+** s3 ls
+* **Common Findings**: Outputs to ${ENG_HOME}/common_findings/
+** find_open_security_groups.py
+** iam_user_check_aged_access_credentials.py
+** S3 Bucket Globally Readable ACL
+** S3 Bucket Globally Readable
+** S3 Bucket Globally Writable AC
+** S3 Bucket Gloablly Writable
+** AWS Root Account Missing MFA
+** AWS Root Account with Access Key
+** AWS Root Account with Recent Activity
+** Ensure CloudTrail Trails are Configured with KMS CMK
+** Ensure CloudTrail Trails are Integrated with CloudWatch Logs
+** IAM Console Users Missing MFA
+** Unencrypted EBS Storage - Volume
+** Unencrypted EBS Storage - Snapshots
+
+=== find_open_security_groups.py
+
+A script that will search the Security Groups in an AWS account and report matches for specific ports, allowed IP ranges, and public IP addresses. Can "flatten" multiple ports so that the output provides a series of ranges for the ports if all of parts of the security group rules in the same security group match, effectively compressing multiple similar results where only the allowed IP ranges differ.
+
+Current accepts multiple arguments to manipulate the output as needed.
+
+TODO: Currently only supports a single AWS account but plan to update accepting multiple once I have time to do so.
+
+```
+> $ python3 find_open_security_groups.py --help
+usage: find_open_security_groups [-h] [--credentials_file CREDENTIALS_FILE] [-p PROFILE] [--access_key_id ACCESS_KEY_ID]
+                                 [--secret_access_key SECRET_ACCESS_KEY] [--session_token SESSION_TOKEN]
+                                 [--regions REGIONS [REGIONS ...]] [--verbose] [-o PORTS [PORTS ...]]
+                                 [-r REMOVE_COLUMN [REMOVE_COLUMN ...]] [-a] [-sa] [-se] [-e] [-c] [-sh]
+
+Will search for and report "open" security groups.
+
+options:
+  -h, --help            show this help message and exit
+  --credentials_file CREDENTIALS_FILE
+                        Location of AWS Credentials file. Defaults to /home/pdmayo/.aws/credentials
+  -p PROFILE, --profile PROFILE
+                        Specify profile in credentials file to use. Defaults to 'default'.
+  --access_key_id ACCESS_KEY_ID
+                        Specify an AWS Access Key ID
+  --secret_access_key SECRET_ACCESS_KEY
+                        Specify an AWS Secret Access Key
+  --session_token SESSION_TOKEN
+                        Specify a temporary AWS Session Token
+  --regions REGIONS [REGIONS ...]
+                        Specify a single or multiple regions. 'all-regions' will instruct script to check allregions. Defaults to value
+                        in credentials file or all-regions.
+  --verbose             Report output every step of the way.
+  -o PORTS [PORTS ...], --ports PORTS [PORTS ...]
+                        Specific ports to check for. Can specify "any" for all.
+  -r REMOVE_COLUMN [REMOVE_COLUMN ...], --remove-column REMOVE_COLUMN [REMOVE_COLUMN ...]
+                        Remove columns from output. (account,region,group_id,protocol,ports,ipv4,ipv6,attached,public_ips,instance_id)
+  -a, --show-all        Output all Security Groups, including those not currently in use.
+  -sa, --sum-attachments
+                        Sum list of attachments instead printing all.
+  -se, --sum-external-ips
+                        Sum list of external IPs instead printing all.
+  -e, --external-ips-only
+                        Only include Security Groups in used with External IPs in output.
+  -c, --compress-ports  Compress ports from multiple entries into one section to reduce output.
+  -sh, --show-header    Print header columns with output.
+```
+
+=== iam_user_check_ages_access_credentials.py
+
+A script that will search IAM users and report on any that have no activity, passwords not changed in, or access tokens older than X days. Multiple cli options allow you to adjust the output as desired. Can currently save to csv, xlsx, png, or any combination of the three. Multiple exact aws profile names (as declared in ~/.aws/credentials) can be passed to the `--profile` argument and it will run against each profile. 
+
+
+```
+> $ python3 ./iam_user_check_aged_access_credentials.py --help
+usage: find_open_security_groups [-h] [--credentials_file CREDENTIALS_FILE] [-p PROFILES [PROFILES ...]] [--verbose]
+                                 [-f REPORT_FORMAT [REPORT_FORMAT ...]] [-o OUTPUT_PATH] [-c COLUMN_WIDTH] [-d DAYS_AGO]
+
+Will search for and report "open" security groups.
+
+options:
+  -h, --help            show this help message and exit
+  --credentials_file CREDENTIALS_FILE
+                        Location of AWS Credentials file. Defaults to /home/pdmayo/.aws/credentials
+  -p PROFILES [PROFILES ...], --profiles PROFILES [PROFILES ...]
+                        Specify profiles in credentials file to use. Defaults to 'default'.
+  --verbose             Report output every step of the way.
+  -f REPORT_FORMAT [REPORT_FORMAT ...], --report-format REPORT_FORMAT [REPORT_FORMAT ...]
+                        Specify report format (csv, xlsx, png). Defaults to xlsx
+  -o OUTPUT_PATH, --output-path OUTPUT_PATH
+                        Specify output path. Defaults to PWD
+  -c COLUMN_WIDTH, --column-width COLUMN_WIDTH
+                        Specify the column width for PNG output. Defaults to 2.5
+  -d DAYS_AGO, --days-ago DAYS_AGO
+                        The number of days ago threshold to compare against. Defaults to 90
+```
+
+=== s3_bucket_global_check.sh
+
+A simple script will perform AWS api, virtual-host, and path checks to see if an S3 bucket is publicly readable to some degree. Further review should be conducted for any findings as a fair amount of time it's just the root of the bucket that is accessible allowing object key names to be seen, but the objects themselves are not able to be accessed.
+
+Currently supports passing in a single profile name as strictly defined in ~/.aws/credentials or a regex variable similar to aws-all to run against each aws profile matching the regex value.
+
+=== r2p
+
+When an AWS IAM role is assumed it will return JSON data that includes the access token, secret key, and secret token which can be added to ~/.aws/credentials as a new profile to provide programmatic access. With some gigs, the IAM role is set with a short session duration (1 hour), which would require the credentials file to be updated multiple times during a day. This short pythong script receives the JSON datea pipe'd to it and will update or add the specified aws profile in ~/.aws/credentials in an easier manner.
+
+**Example**
+
+`aws --profile rt sts assume-role --role-arn "arn:aws:iam::123456789012:role/TrustedSec-AWS-PenTest-Role --role-session-name ts-aws-pentest" --external-id "secret-value-1" | r2p -p client1 -r us-east-1`

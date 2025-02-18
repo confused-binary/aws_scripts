@@ -1,0 +1,10 @@
+#! /bin/bash
+# A simple wrapper to run commands against all profiles in 
+# ~/.aws/credentials that match the ENG regex variable.
+# Place in some PATH locations
+
+for prof in $(aws configure list-profiles | grep "${ENG}"); do
+    export AWS_PROFILE=${prof}
+    acct_id=$(aws --profile ${prof} sts get-caller-identity | jq -r '.Account')
+    eval "aws $@"
+done

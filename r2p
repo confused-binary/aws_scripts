@@ -1,0 +1,49 @@
+#!/usr/bin/env python3
+# Drop into some PATH and pass json formatted AWS API response for assume-role to it
+import os
+import sys
+import json
+import configparser
+import argparse
+
+# Read args and make sure a profile is specified - I'm not responsible if you overwrite default
+parser = argparse.ArgumentParser(description='AWS role to profile script. Add or update an existing profile in ~/.aws/credentials')
+parser.add_argument('-p', '--profile', default=None, required=True, help='Gimme a profile name.')
+parser.add_argument('-r', '--region', default=None, help='Specify a region.')
+ARGS = parser.parse_args()
+
+# Read STDIN json from aws cli
+data = json.load(sys.stdin)
+
+# Load in the currnet credentials file
+HOME = os.path.expanduser("~")
+config = configparser.ConfigParser()
+config.read(HOME + '/.aws/credentials')
+
+# If profile entry existed with a region, save it
+region = False
+if ARGS.profile in config and 'region' in config[ARGS.profile]:
+    region = config[ARGS.profile]['region']
+
+access_key = data.get('Credentials', {}).get('AccessKeyId') or data.get('AccessKeyId')
+secret_key = data.get('Credentials', {}).get('SecretAccessKey') or data.get('SecretAccessKey')
+session_token = data.get('Credentials', {}).get('SessionToken') or data.get('Token')
+
+profile = {
+    "aws_access_key_id": access_key,
+    "aws_secret_access_key": secret_key,
+    "aws_session_token": session_token
+}
+
+# Set saved region
+if region:
+    profile['region'] = region
+if ARGS.region:
+    profile['region'] = ARGS.region
+
+# Set profile to config
+config[ARGS.profile] = profile
+
+# Save to file
+with open(HOME + '/.aws/credentials', 'w') as configfile:
+    config.write(configfile)

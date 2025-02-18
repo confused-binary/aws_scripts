@@ -1,0 +1,6 @@
+boto3
+botocore
+matplotlib
+numpy
+pandas
+XlsxWriter

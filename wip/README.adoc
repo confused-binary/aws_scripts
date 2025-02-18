@@ -1,0 +1,9 @@
+# WIP Scripts
+
+**Warning**
+No guarantees. Run at your own risk and commitment to troubleshooting
+
+Some of these may role into the scripts for findings
+
+Some are more useful for enumeration or repeated processes during enum than direct reporting
+
